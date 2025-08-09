@@ -6,9 +6,10 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog"
+
 import {
-  Info, Pencil, Trash2, Send, PencilOff, CirclePlus, RotateCw,
+  Info, Pencil, Trash2, Send, PencilOff, CirclePlus, RotateCw, X
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -180,9 +181,9 @@ export default function ControlCookie() {
                     </Button>
                   </DialogTrigger>
 
-                  <DialogContent className="text-sm space-y-1">
-                    <div><strong>Name:</strong> {cookie.name}</div>
-                    <div><strong>Value:</strong> {cookie.value}</div>
+                  <DialogContent className="text-sm space-y-1 max-h-[80vh] overflow-auto">
+                    <div className="break-words"><strong>Name:</strong> {cookie.name}</div>
+                    <div className="break-words"><strong>Value:</strong> {cookie.value}</div>
                     <div><strong>Domain:</strong> {cookie.domain}</div>
                     <div><strong>Path:</strong> {cookie.path}</div>
                     <div><strong>Secure:</strong> {cookie.secure ? "✓" : "×"}</div>
@@ -194,6 +195,7 @@ export default function ControlCookie() {
                     )}
                   </DialogContent>
                 </Dialog>
+
               </div>
 
               <div className="flex items-center gap-2">

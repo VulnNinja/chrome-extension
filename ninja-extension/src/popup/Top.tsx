@@ -15,6 +15,7 @@ import {
 import GeneratePassword from "./pages/generatePassword"
 import { ModeToggle } from "@/components/mode-toggle"
 import ControlCookie from "./pages/controlCookie"
+import CheckIframeEnbed from "./pages/checkIframeEnbed"
 
 const tabItems = [
   {
@@ -30,7 +31,7 @@ const tabItems = [
   {
     value: "check-iframe-enbed",
     icon: <SquareMousePointer />,
-    content: <>iframe埋め込みテスト</>,
+    content: <CheckIframeEnbed />,
   },
   {
     value: "bookmark",

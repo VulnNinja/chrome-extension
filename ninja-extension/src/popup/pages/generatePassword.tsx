@@ -190,7 +190,7 @@ export default function GeneratePassword() {
 
         {/* 生成ボタンと個数 */}
         <div className="flex items-center gap-2 w-full">
-          <Button variant="outline" size="lg" onClick={handleGenerate}>
+          <Button size="lg" onClick={handleGenerate}>
             <RefreshCcw className="h-4 w-4 mr-2" />
             パスワードを生成
           </Button>
