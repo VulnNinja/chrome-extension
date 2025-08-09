@@ -16,7 +16,7 @@ const UPPER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const DIGITS = "0123456789";
 const SPECIALS = "!@#$%^&*";
 
-export default function PasswordGeneratorDevtoys() {
+export default function GeneratePassword() {
   // 基本設定
   const [length, setLength] = React.useState<number>(30);
   const [count, setCount] = React.useState<number>(1);
@@ -132,7 +132,7 @@ export default function PasswordGeneratorDevtoys() {
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle>パスワード生成ツール</CardTitle>
+        <CardTitle className="text-lg">パスワード生成ツール</CardTitle>
       </CardHeader>
 
       <CardContent className="grid gap-6">
@@ -213,7 +213,7 @@ export default function PasswordGeneratorDevtoys() {
             <div className="flex flex-col gap-2">
               {passwords.map((pwd, idx) => (
                 <div key={idx} className="flex items-center gap-2 w-full">
-                  <Input value={pwd} readOnly className="flex-1" />
+                  <Input value={pwd} readOnly className="flex-1 text-xs" />
                   <Button
                     variant="outline"
                     size="sm"

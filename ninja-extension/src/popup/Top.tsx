@@ -1,15 +1,11 @@
-import { CodeIcon, Cookie, RectangleEllipsis } from "lucide-react"
-import { Button } from "@/components/ui/button"
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+  Bookmark,
+  CodeIcon,
+  Cookie,
+  NotebookPen,
+  RectangleEllipsis,
+  SquareMousePointer,
+} from "lucide-react"
 import {
   Tabs,
   TabsContent,
@@ -17,71 +13,66 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs"
 import GeneratePassword from "./pages/generatePassword"
+import { ModeToggle } from "@/components/mode-toggle"
+import ControlCookie from "./pages/controlCookie"
+
+const tabItems = [
+  {
+    value: "generate-password",
+    icon: <RectangleEllipsis />,
+    content: <GeneratePassword />,
+  },
+  {
+    value: "control-cookies",
+    icon: <Cookie />,
+    content: <ControlCookie />,
+  },
+  {
+    value: "check-iframe-enbed",
+    icon: <SquareMousePointer />,
+    content: <>iframe埋め込みテスト</>,
+  },
+  {
+    value: "bookmark",
+    icon: <Bookmark />,
+    content: <>ブックマーク機能</>,
+  },
+  {
+    value: "memo",
+    icon: <NotebookPen />,
+    content: <>メモ機能（Originごと）</>,
+  },
+  {
+    value: "test",
+    icon: <CodeIcon />,
+    content: <>Test</>,
+  },
+]
 
 const Top = () => {
   return (
-    <div className="w-[360px] sm:w-[420px] min-h-[260px] p-4 mx-auto shadow-md flex flex-col items-center justify-center">
-      <div className="flex w-full max-w-sm flex-col gap-6">
-        <Tabs defaultValue="account">
-          <TabsList>
-            <TabsTrigger value="account"><RectangleEllipsis /></TabsTrigger>
-            <TabsTrigger value="password"><Cookie /></TabsTrigger>
-            <TabsTrigger value="test"><CodeIcon /></TabsTrigger>
-          </TabsList>
-          <TabsContent value="account">
-            < GeneratePassword />
-          </TabsContent>
-          <TabsContent value="password">
-            <Card>
-              <CardHeader>
-                <CardTitle>Password</CardTitle>
-                <CardDescription>
-                  Change your password here. After saving, you&apos;ll be logged
-                  out.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-6">
-                <div className="grid gap-3">
-                  <Label htmlFor="tabs-demo-current">Current password</Label>
-                  <Input id="tabs-demo-current" type="password" />
-                </div>
-                <div className="grid gap-3">
-                  <Label htmlFor="tabs-demo-new">New password</Label>
-                  <Input id="tabs-demo-new" type="password" />
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button>Save password</Button>
-              </CardFooter>
-            </Card>
-          </TabsContent>
-          <TabsContent value="test">
-            <Card>
-              <CardHeader>
-                <CardTitle>Account</CardTitle>
-                <CardDescription>
-                  Make changes to your account here. Click save when you&apos;re
-                  done.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-6">
-                <div className="grid gap-3">
-                  <Label htmlFor="tabs-demo-name">Name</Label>
-                  <Input id="tabs-demo-name" defaultValue="Pedro Duarte" />
-                </div>
-                <div className="grid gap-3">
-                  <Label htmlFor="tabs-demo-username">Username</Label>
-                  <Input id="tabs-demo-username" defaultValue="@peduarte" />
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button>Save changes</Button>
-              </CardFooter>
-            </Card>
-          </TabsContent>
-        </Tabs>
+    <Tabs defaultValue="generate-password" className="relative w-[360px] h-[500px] bg-background overflow-hidden">
+      {/* 固定ヘッダー */}
+      <div className="sticky top-0 z-10 flex justify-between items-center px-2 py-2 shadow">
+        <TabsList className="flex gap-1">
+          {tabItems.map(({ value, icon }) => (
+            <TabsTrigger key={value} value={value} className="p-2">
+              {icon}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+        <ModeToggle />
       </div>
-    </div>
+
+      {/* コンテンツエリア */}
+      <div className="px-4 py-2 overflow-y-auto h-[calc(100%-56px)]">
+        {tabItems.map(({ value, content }) => (
+          <TabsContent key={value} value={value} >
+            {content}
+          </TabsContent>
+        ))}
+      </div>
+    </Tabs>
   )
 }
 

@@ -15,9 +15,14 @@ export default defineManifest({
     default_popup: 'src/popup/index.html',
   },
   permissions: [
+    'storage',
+    'tabs',
+    'cookies',
+    'scripting',
     'sidePanel',
     'contentSettings',
   ],
+  host_permissions: ['<all_urls>'],
   content_scripts: [{
     js: ['src/content/main.tsx'],
     matches: ['https://*/*'],
