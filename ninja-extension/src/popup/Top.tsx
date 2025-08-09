@@ -16,6 +16,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs"
+import GeneratePassword from "./pages/generatePassword"
 
 const Top = () => {
   return (
@@ -28,28 +29,7 @@ const Top = () => {
             <TabsTrigger value="test"><CodeIcon /></TabsTrigger>
           </TabsList>
           <TabsContent value="account">
-            <Card>
-              <CardHeader>
-                <CardTitle>Account</CardTitle>
-                <CardDescription>
-                  Make changes to your account here. Click save when you&apos;re
-                  done.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-6">
-                <div className="grid gap-3">
-                  <Label htmlFor="tabs-demo-name">Name</Label>
-                  <Input id="tabs-demo-name" defaultValue="Pedro Duarte" />
-                </div>
-                <div className="grid gap-3">
-                  <Label htmlFor="tabs-demo-username">Username</Label>
-                  <Input id="tabs-demo-username" defaultValue="@peduarte" />
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button>Save changes</Button>
-              </CardFooter>
-            </Card>
+            < GeneratePassword />
           </TabsContent>
           <TabsContent value="password">
             <Card>
