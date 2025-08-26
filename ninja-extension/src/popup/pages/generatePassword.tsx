@@ -219,7 +219,7 @@ export default function GeneratePassword() {
                     size="sm"
                     onClick={() => copyPassword(pwd, idx)}
                   >
-                    <Copy className="h-4 w-4" />
+                    {copiedIndex === idx ? "Copied!" : <Copy className="h-4 w-4" />}
                   </Button>
                 </div>
               ))}

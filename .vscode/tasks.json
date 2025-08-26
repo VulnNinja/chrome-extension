@@ -1,0 +1,44 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "実行",
+      "type": "shell",
+      "command": "pnpm",
+      "args": [
+        "run",
+        "dev"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/ninja-extension"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Code Style Fix",
+      "type": "shell",
+      "command": "pnpm",
+      "args": [
+        "run",
+        "fix code style"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/ninja-extension"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Style Format",
+      "type": "shell",
+      "command": "pnpm",
+      "args": [
+        "run",
+        "fix:style"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/ninja-extension"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

@@ -6,10 +6,10 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog"
+import { Dialog, DialogTrigger, DialogContent } from "@/components/ui/dialog"
 
 import {
-  Info, Pencil, Trash2, Send, PencilOff, CirclePlus, RotateCw, X
+  Info, Pencil, Trash2, Send, PencilOff, CirclePlus, RotateCw
 } from "lucide-react";
 import { useState, useEffect } from "react";
 

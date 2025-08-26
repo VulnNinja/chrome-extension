@@ -41,7 +41,7 @@ export default function CheckIframeEmbed() {
   }
 
   return (
-    <Card className="w-full max-w-md mx-auto mt-4">
+    <Card className="w-full max-w-md mx-auto">
       <CardHeader>
         <CardTitle className="text-lg">iframe埋め込みテスト</CardTitle>
       </CardHeader>

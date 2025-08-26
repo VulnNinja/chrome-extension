@@ -2,9 +2,11 @@ import {
   Bookmark,
   CodeIcon,
   Cookie,
+  KeyRound,
   NotebookPen,
   RectangleEllipsis,
   SquareMousePointer,
+  UsersRound,
 } from "lucide-react"
 import {
   Tabs,
@@ -34,6 +36,11 @@ const tabItems = [
     content: <CheckIframeEnbed />,
   },
   {
+    value: "password-manager",
+    icon: <KeyRound />,
+    content: <>パスワードマネージャー</>,
+  },
+  {
     value: "bookmark",
     icon: <Bookmark />,
     content: <>ブックマーク機能</>,
@@ -42,6 +49,11 @@ const tabItems = [
     value: "memo",
     icon: <NotebookPen />,
     content: <>メモ機能（Originごと）</>,
+  },
+  {
+    value: "test",
+    icon: <CodeIcon />,
+    content: <>Test</>,
   },
   {
     value: "test",
