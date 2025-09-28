@@ -1,12 +1,10 @@
 import {
   Bookmark,
-  CodeIcon,
   Cookie,
   KeyRound,
   NotebookPen,
   RectangleEllipsis,
   SquareMousePointer,
-  UsersRound,
 } from "lucide-react"
 import {
   Tabs,
@@ -18,6 +16,9 @@ import GeneratePassword from "./pages/generatePassword"
 import { ModeToggle } from "@/components/mode-toggle"
 import ControlCookie from "./pages/controlCookie"
 import CheckIframeEnbed from "./pages/checkIframeEnbed"
+import AccountManager from "./pages/manageAccount"
+import BookmarkManager from "./pages/bookmark"
+import OriginMemo from "./pages/memo"
 
 const tabItems = [
   {
@@ -38,33 +39,23 @@ const tabItems = [
   {
     value: "password-manager",
     icon: <KeyRound />,
-    content: <>パスワードマネージャー</>,
+    content: <AccountManager />,
   },
   {
     value: "bookmark",
     icon: <Bookmark />,
-    content: <>ブックマーク機能</>,
+    content: <BookmarkManager />,
   },
   {
     value: "memo",
     icon: <NotebookPen />,
-    content: <>メモ機能（Originごと）</>,
-  },
-  {
-    value: "test",
-    icon: <CodeIcon />,
-    content: <>Test</>,
-  },
-  {
-    value: "test",
-    icon: <CodeIcon />,
-    content: <>Test</>,
-  },
+    content: <OriginMemo />
+  }
 ]
 
 const Top = () => {
   return (
-    <Tabs defaultValue="generate-password" className="relative w-[360px] h-[500px] bg-background overflow-hidden">
+    <Tabs defaultValue="generate-password" className="relative w-[400px] h-[556px] bg-background overflow-hidden">
       {/* 固定ヘッダー */}
       <div className="sticky top-0 z-10 flex justify-between items-center px-2 py-2 shadow">
         <TabsList className="flex gap-1">

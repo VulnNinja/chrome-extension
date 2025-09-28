@@ -118,3 +118,20 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ダーク/ライトに追従させる */
+:root { color-scheme: light; }        /* ブラウザに両テーマ対応を知らせる */
+.dark { color-scheme: dark; }
+
+/* Chromium 系のスクロールバー */
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background-color: rgba(0,0,0,.2); border-radius: 8px; }
+.dark *::-webkit-scrollbar-thumb { background-color: rgba(255,255,255,.3); }
+
+/* 念のためフォーム要素が確実に継承するよう明示 */
+@layer base {
+  input, textarea, select, button {
+    color-scheme: inherit;
+  }
+}
