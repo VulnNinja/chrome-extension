@@ -171,9 +171,12 @@ export default function ControlCookie() {
     for (const list of map.values()) list.sort((a, b) => a.name.localeCompare(b.name))
     const pairs = Array.from(map.entries())
     pairs.sort((a, b) => {
-      if (host && a[0] === host) return -1
-      if (host && b[0] === host) return 1
-      return a[0].localeCompare(b[0])
+      const h = host ?? ""
+      const aKey = a[0].replace(/^\./, "")
+      const bKey = b[0].replace(/^\./, "")
+      if (h && aKey === h) return -1
+      if (h && bKey === h) return 1
+      return aKey.localeCompare(bKey)
     })
     return pairs
   }, [filtered, host])
@@ -246,14 +249,18 @@ export default function ControlCookie() {
       <CardContent className="relative grid gap-4 overflow-x-hidden pb-12">
         {/* 情報バー */}
         <div className="rounded-xl border p-3 bg-muted/30">
-          <div className="flex items-center gap-2 text-sm min-w-0">
-            <CookieIcon className="h-4 w-4 shrink-0" />
-            <span className="truncate">Host: {host ?? "取得中..."}</span>
-            <Badge variant="secondary" className="ml-auto shrink-0">{scope === "url" ? "URL" : "Domain"}</Badge>
+          {/* ← Host が長くても崩れないように「ラベル固定＋値だけ truncate」 */}
+          <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 text-sm min-w-0">
+            <div className="flex items-center gap-2 shrink-0">
+              <CookieIcon className="h-4 w-4" />
+              <span className="text-muted-foreground">Host:</span>
+            </div>
+            <span className="truncate" title={host ?? ""}>{host ?? "取得中..."}</span>
+            <Badge variant="secondary" className="justify-self-end">{scope === "url" ? "URL" : "Domain"}</Badge>
           </div>
 
-          <div className="mt-2 flex items-center gap-2">
-            <div className="relative flex-1 min-w-0">
+          <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto_auto_auto_auto] gap-2 items-center">
+            <div className="relative min-w-0">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 opacity-60" />
               <Input
                 className="pl-8"
@@ -263,25 +270,27 @@ export default function ControlCookie() {
               />
             </div>
 
-            <Button variant="outline" size="icon" title="再取得" onClick={load}>
+            <Button variant="outline" size="icon" title="再取得" onClick={load} className="h-9 w-9">
               <RotateCw className="h-4 w-4" />
             </Button>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" title="その他">
+                <Button variant="outline" size="icon" title="出力/その他" className="h-9 w-9">
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuItem onClick={() => setScope("url")}>現在URL</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setScope("domain")}>ドメイン全体</DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={exportJson}>
-                  <Download className="h-4 w-4 mr-2" />JSON書き出し
+                  <Download className="h-4 w-4 mr-2" />
+                  JSON書き出し
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => fileRef.current?.click()}>
-                  <Upload className="h-4 w-4 mr-2" />JSON読み込み
+                  <Upload className="h-4 w-4 mr-2" />
+                  JSON読み込み
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -289,7 +298,7 @@ export default function ControlCookie() {
             {/* 追加（アイコンのみ） */}
             <Dialog open={addingOpen} onOpenChange={setAddingOpen}>
               <DialogTrigger asChild>
-                <Button size="icon" title="追加">
+                <Button size="icon" title="追加" className="h-9 w-9">
                   <CirclePlus className="h-5 w-5" />
                 </Button>
               </DialogTrigger>
@@ -327,105 +336,132 @@ export default function ControlCookie() {
           <div className="text-sm text-muted-foreground">Cookie がありません</div>
         ) : (
           <Accordion type="multiple" className="w-full min-w-0">
-            {grouped.map(([domain, list]) => (
-              <AccordionItem key={domain} value={domain}>
-                <AccordionTrigger className="text-left">
-                  <div className="flex items-center gap-2 min-w-0 w-full">
-                    <span className="font-medium truncate">{domain}</span>
-                    <Badge variant="secondary" className="shrink-0">{list.length}</Badge>
-                    {host === domain && <Badge className="bg-primary/15 text-primary border-0 shrink-0">現在ホスト</Badge>}
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent>
-                  <div className="flex flex-col gap-2">
-                    {list.map((c) => {
-                      const rowKey = keyOf(c)
-                      const copied = copiedKey === rowKey
-                      const risky = (!c.secure && (activeUrl?.startsWith("https://") ?? true)) || !c.httpOnly
+            {grouped.map(([domain, list]) => {
+              const isCurrent = (host ?? "").replace(/^\./, "") === domain.replace(/^\./, "")
+              return (
+                <AccordionItem key={domain} value={domain}>
+                  <AccordionTrigger className="text-left">
+                    {/* ドメイン見出し：左可変・右固定の 3 カラムで崩れ防止 */}
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 w-full">
+                      <span className="font-medium truncate" title={domain}>{domain}</span>
+                      <Badge variant="secondary" className="justify-self-end">{list.length}</Badge>
+                      {isCurrent && (
+                        <Badge className="bg-primary/15 text-primary border-0 justify-self-end">
+                          現在ホスト
+                        </Badge>
+                      )}
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="flex flex-col gap-2">
+                      {list.map((c) => {
+                        const rowKey = keyOf(c)
+                        const copied = copiedKey === rowKey
+                        const risky = (!c.secure && (activeUrl?.startsWith("https://") ?? true)) || !c.httpOnly
+                        const isEditing = editingKey === rowKey
 
-                      const isEditing = editingKey === rowKey
-                      return (
-                        <div key={rowKey} className="rounded-lg border p-3 space-y-2">
-                          {/* 1行目：cookie名 と 詳細ボタン（アイコンのみ） */}
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="font-medium truncate">{c.name}</span>
-                            <div className="ml-auto flex items-center gap-1 shrink-0">
-                              {risky ? (
-                                <Badge variant="destructive" className="shrink-0">
-                                  <ShieldAlert className="h-3 w-3 mr-1" />注意
-                                </Badge>
-                              ) : (
-                                <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-0 shrink-0">
-                                  <ShieldCheck className="h-3 w-3 mr-1" />良好
-                                </Badge>
-                              )}
-                              <Button
-                                variant="ghost" size="icon" title="詳細"
-                                onClick={() => setDetailCookie(c)}
-                                className="h-8 w-8"
-                              >
-                                <Info className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-
-                          {/* 2行目：value(input) と アイコンボタン（編集 / 削除 / コピー） */}
-                          <div className="flex items-center gap-2 min-w-0">
-                            <Input
-                              readOnly={!isEditing}
-                              value={isEditing ? editingValue : c.value}
-                              onChange={(e) => setEditingValue(e.target.value)}
-                              onFocus={(e) => !isEditing && e.currentTarget.select()}
-                              className="h-8 font-mono flex-1 min-w-0"
-                            />
-                            {isEditing ? (
-                              <>
+                        return (
+                          <div key={rowKey} className="rounded-lg border p-3 space-y-2">
+                            {/* 1段目：名前＋バッジ＋詳細ボタン（右端固定） */}
+                            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+                              <span className="font-medium truncate" title={c.name}>{c.name}</span>
+                              <div className="flex items-center gap-1 justify-self-end">
+                                {risky ? (
+                                  <Badge variant="destructive" className="shrink-0">
+                                    <ShieldAlert className="h-3 w-3 mr-1" />注意
+                                  </Badge>
+                                ) : (
+                                  <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-0 shrink-0">
+                                    <ShieldCheck className="h-3 w-3 mr-1" />良好
+                                  </Badge>
+                                )}
                                 <Button
-                                  variant="outline" size="icon" title="保存"
-                                  onClick={() => {
+                                  variant="ghost" size="icon" title="詳細"
+                                  onClick={() => setDetailCookie(c)}
+                                  className="h-8 w-8 shrink-0"
+                                >
+                                  <Info className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* 2段目：値（Input）＋コピー＋操作メニュー（または保存/キャンセル） */}
+                            <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2">
+                              <Input
+                                readOnly={!isEditing}
+                                value={isEditing ? editingValue : c.value}
+                                onChange={(e) => setEditingValue(e.target.value)}
+                                onFocus={(e) => !isEditing && e.currentTarget.select()}
+                                onKeyDown={(e) => {
+                                  if (isEditing && e.key === "Enter") {
                                     setCookie({ ...c, value: editingValue })
                                     setEditingKey(null)
-                                  }}
-                                >
-                                  <Check className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost" size="icon" title="キャンセル"
-                                  onClick={() => { setEditingKey(null); setEditingValue("") }}
-                                >
-                                  <X className="h-4 w-4" />
-                                </Button>
-                              </>
-                            ) : (
-                              <>
-                                <Button
-                                  variant="outline" size="icon" title="コピー"
-                                  onClick={() => copyText(rowKey, c.value)}
-                                >
-                                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                                </Button>
-                                <Button
-                                  variant="outline" size="icon" title="編集"
-                                  onClick={() => { setEditingKey(rowKey); setEditingValue(c.value) }}
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="outline" size="icon" title="削除"
-                                  onClick={() => removeCookie(c)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </>
-                            )}
+                                  }
+                                }}
+                                className="h-8 font-mono flex-1 min-w-0"
+                              />
+
+                              {/* コピー */}
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                title="コピー"
+                                className="h-8 w-8 shrink-0"
+                                onClick={() => copyText(rowKey, c.value)}
+                              >
+                                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                              </Button>
+
+                              {/* 右端：編集モード時は保存/キャンセル、通常はプルダウン */}
+                              {isEditing ? (
+                                <div className="flex items-center gap-2 justify-self-end">
+                                  <Button
+                                    variant="outline" size="icon" title="保存"
+                                    className="h-8 w-8"
+                                    onClick={() => { setCookie({ ...c, value: editingValue }); setEditingKey(null) }}
+                                  >
+                                    <Check className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost" size="icon" title="キャンセル"
+                                    className="h-8 w-8"
+                                    onClick={() => { setEditingKey(null); setEditingValue("") }}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="icon" className="h-8 w-8" title="操作">
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-36">
+                                    <DropdownMenuItem
+                                      onClick={() => { setEditingKey(rowKey); setEditingValue(c.value) }}
+                                    >
+                                      <Pencil className="h-4 w-4 mr-2" />
+                                      編集
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() => removeCookie(c)}
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      削除
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            ))}
+                        )
+                      })}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              )
+            })}
           </Accordion>
         )}
 
@@ -435,17 +471,18 @@ export default function ControlCookie() {
             <DialogHeader><DialogTitle>Cookie詳細</DialogTitle></DialogHeader>
             {detailCookie && (
               <div className="grid gap-3 text-sm">
-                <KV label="Name" value={detailCookie.name} />
+                <KV label="Name" value={detailCookie.name} mono />
                 <div className="grid gap-1">
                   <Label>Value</Label>
+                  {/* 長文は Textarea で横スクロール排除 */}
                   <Textarea
                     readOnly
                     value={detailCookie.value}
                     className="h-24 font-mono overflow-x-hidden"
                   />
                 </div>
-                <KV label="Domain" value={detailCookie.domain} />
-                <KV label="Path" value={detailCookie.path} />
+                <KV label="Domain" value={detailCookie.domain} mono />
+                <KV label="Path" value={detailCookie.path} mono />
                 <KV label="Expires" value={fmtDateTime(detailCookie.expirationDate)} />
                 <KV label="Secure" value={detailCookie.secure ? "✓" : "×"} />
                 <KV label="HttpOnly" value={detailCookie.httpOnly ? "✓" : "×"} />
@@ -479,9 +516,9 @@ export default function ControlCookie() {
 /* ======================== サブコンポーネント ======================== */
 function KV({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="flex items-start gap-2 min-w-0">
+    <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-2 min-w-0">
       <span className="w-24 text-muted-foreground shrink-0">{label}</span>
-      <span className={`break-words ${mono ? "font-mono" : ""}`}>{value}</span>
+      <span className={`${mono ? "font-mono" : ""} break-words`}>{value}</span>
     </div>
   )
 }
@@ -491,7 +528,8 @@ function Decoder({ value }: { value: string }) {
   return (
     <div className="grid gap-2">
       <Label>{res.label}</Label>
-      <Textarea readOnly className="h-32 font-mono" value={res.text} />
+      {/* JWT/長文でも崩れないように固定高＋改行 */}
+      <Textarea readOnly className="h-32 font-mono whitespace-pre-wrap break-words" value={res.text} />
       <div className="text-xs text-muted-foreground">
         URL/Base64URL/JWT を自動推測して表示します（推測結果の正確性は保証しません）。
       </div>

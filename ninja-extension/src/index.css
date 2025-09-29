@@ -111,6 +111,11 @@
 }
 
 @layer base {
+  html { color-scheme: light; }  /* 既定はライト */
+  html.dark { color-scheme: dark; }  /* ダーク時にルートで切替 */
+
+  /* フォーム系が確実に継承するように */
+  input, textarea, select, button { color-scheme: inherit; }
   * {
     @apply border-border outline-ring/50;
   }
@@ -119,9 +124,6 @@
   }
 }
 
-/* ダーク/ライトに追従させる */
-:root { color-scheme: light; }        /* ブラウザに両テーマ対応を知らせる */
-.dark { color-scheme: dark; }
 
 /* Chromium 系のスクロールバー */
 *::-webkit-scrollbar { width: 8px; height: 8px; }

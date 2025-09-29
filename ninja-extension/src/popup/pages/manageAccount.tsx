@@ -143,7 +143,6 @@ function StrengthBadge({ pw }: { pw: string }) {
 
 /* =========================================================
    AccountManager
-   - ステータスは「浮遊フローティング」表示でレイアウト崩れ回避
 ========================================================= */
 
 type Tone = "success" | "error" | "info"
@@ -158,7 +157,6 @@ export default function AccountManager() {
   const [copiedKey, setCopiedKey] = useState<string | null>(null) // `${id}:user` or `${id}:pass`
   const copyTimerRef = useRef<number | null>(null)
 
-  // ここを string -> {text,tone} に変更
   const [status, setStatus] = useState<{ text: string; tone: Tone } | null>(null)
   const statusTimerRef = useRef<number | null>(null)
 
@@ -191,9 +189,12 @@ export default function AccountManager() {
     for (const arr of map.values()) arr.sort((a, b) => b.updatedAt - a.updatedAt)
     const entries = Array.from(map.entries())
     entries.sort((a, b) => {
-      if (host && a[0] === host) return -1
-      if (host && b[0] === host) return 1
-      return a[0].localeCompare(b[0])
+      const h = host ?? ""
+      const aKey = a[0].replace(/^\./, "")
+      const bKey = b[0].replace(/^\./, "")
+      if (h && aKey === h) return -1
+      if (h && bKey === h) return 1
+      return aKey.localeCompare(bKey)
     })
     return entries
   }, [filtered, host])
@@ -240,7 +241,6 @@ export default function AccountManager() {
     }
   }
 
-  /* ---------------- 自動入力（content へのスクリプト注入） ---------------- */
   const fillAccountOnPage = async (username: string, password: string, doSubmit: boolean) => {
     try {
       if (!chromeApi?.tabs?.query || !chromeApi?.scripting?.executeScript) {
@@ -260,13 +260,7 @@ export default function AccountManager() {
           const isVisible = (el: HTMLElement) => {
             const style = window.getComputedStyle(el)
             const rect = el.getBoundingClientRect()
-            return (
-              style.visibility !== "hidden" &&
-              style.display !== "none" &&
-              !el.hasAttribute("disabled") &&
-              rect.width > 0 &&
-              rect.height > 0
-            )
+            return style.visibility !== "hidden" && style.display !== "none" && !el.hasAttribute("disabled") && rect.width > 0 && rect.height > 0
           }
           const pick = (sel: string): HTMLInputElement | null => {
             const nodes = Array.from(document.querySelectorAll<HTMLInputElement>(sel)).filter(isVisible)
@@ -284,8 +278,7 @@ export default function AccountManager() {
             return nodes[0] ?? null
           }
           const userInput =
-            pick('input[autocomplete="username"],input[type="email"],input[type="text"],input[name*="user" i],input[id*="user" i],input[name*="login" i],input[id*="login" i],input[name*="email" i],input[id*="email" i]') ||
-            null
+            pick('input[autocomplete="username"],input[type="email"],input[type="text"],input[name*="user" i],input[id*="user" i],input[name*="login" i],input[id*="login" i],input[name*="email" i],input[id*="email" i]') || null
           const passInput =
             (document.querySelector('input[type="password"]') as HTMLInputElement | null) ||
             (document.querySelector('input[name*="pass" i]') as HTMLInputElement | null) ||
@@ -382,23 +375,25 @@ export default function AccountManager() {
         <CardTitle className="text-lg">アカウントマネージャ</CardTitle>
       </CardHeader>
 
-      {/* レイアウト崩れ防止のため relative + 余白を確保 */}
-      <CardContent className="relative grid gap-4 pb-12">
-        {/* ヘッダー：ステータス Badge は置かず、下部浮遊で表示 */}
+      <CardContent className="relative grid gap-4 pb-12 overflow-x-hidden">
+        {/* Host 行（ラベル固定＋値可変） */}
         <div className="rounded-xl border p-3 bg-muted/30">
-          <div className="flex items-center gap-2 text-sm min-w-0">
-            <Globe className="h-4 w-4 shrink-0" />
-            <span className="truncate">{host ?? "現在のサイトを取得できませんでした"}</span>
-            {host && <Badge variant="secondary" className="shrink-0">このサイト</Badge>}
+          <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 text-sm min-w-0">
+            <div className="flex items-center gap-2 shrink-0">
+              <Globe className="h-4 w-4" />
+              <span className="text-muted-foreground">Host:</span>
+            </div>
+            <span className="truncate" title={host ?? ""}>{host ?? "現在のサイトを取得できませんでした"}</span>
+            {host && <Badge variant="secondary" className="justify-self-end shrink-0">このサイト</Badge>}
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            ホスト単位でアカウントを管理。値は入力欄で水平スクロール、レイアウト崩れを防ぎます。
+            ホスト単位でアカウントを管理。値は入力欄で水平スクロールし、レイアウト崩れを防ぎます。
           </p>
         </div>
 
         {/* Toolbar */}
         <div className="flex flex-col gap-3">
-          <div className="relative">
+          <div className="relative min-w-0">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 opacity-60" />
             <Input
               value={search}
@@ -408,27 +403,20 @@ export default function AccountManager() {
             />
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="grid grid-cols-[auto_auto_1fr] gap-2 items-center">
             <Dialog open={addOpen} onOpenChange={setAddOpen}>
               <DialogTrigger asChild>
-                <Button size="sm">
+                <Button size="sm" className="shrink-0">
                   <Plus className="h-4 w-4 mr-1" />
                   新規追加
                 </Button>
               </DialogTrigger>
-              {/* 高さ内に収める（内部スクロール） */}
               <DialogContent className="w-[360px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-24px)] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>アカウントを追加</DialogTitle>
                 </DialogHeader>
                 <AddOrEditForm
-                  initial={{
-                    host: host ?? "",
-                    title: "",
-                    username: "",
-                    password: genPassword(),
-                    note: "",
-                  }}
+                  initial={{ host: host ?? "", title: "", username: "", password: genPassword(), note: "" }}
                   onSubmit={async (vals) =>
                     addAccount({
                       host: vals.host.trim(),
@@ -444,8 +432,8 @@ export default function AccountManager() {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Download className="h-4 w-4 " />
+                <Button variant="outline" size="sm" className="shrink-0">
+                  <Download className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
@@ -466,37 +454,27 @@ export default function AccountManager() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <input
-              ref={fileRef}
-              type="file"
-              accept="application/json"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0]
-                if (f) importJson(f)
-                e.currentTarget.value = ""
-              }}
-            />
+            <div className="justify-self-end" />
           </div>
         </div>
 
         <Separator />
 
-        {/* List（親がスクロールを持つのでここでは overflow を作らない） */}
+        {/* List */}
         {byHost.length === 0 ? (
-          <div className="text-sm text-muted-foreground">
-            まだ登録がありません。「新規追加」から作成してください。
-          </div>
+          <div className="text-sm text-muted-foreground">まだ登録がありません。「新規追加」から作成してください。</div>
         ) : (
-          <Accordion type="multiple" defaultValue={host ? [host] : undefined} className="w-full">
+          <Accordion type="multiple" defaultValue={host ? [host] : undefined} className="w-full min-w-0">
             {byHost.map(([h, accs]) => (
               <AccordionItem key={h} value={h}>
                 <AccordionTrigger className="text-left">
-                  <div className="flex items-center gap-2 min-w-0 w-full">
+                  <div className="grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-2 w-full min-w-0">
                     <Globe className="h-4 w-4 shrink-0" />
-                    <span className="font-medium truncate">{h}</span>
-                    <Badge variant="secondary" className="shrink-0">{accs.length}</Badge>
-                    {host === h && <Badge className="bg-primary/15 text-primary border-0 shrink-0">現在のサイト</Badge>}
+                    <span className="font-medium truncate" title={h}>{h}</span>
+                    <Badge variant="secondary" className="justify-self-end shrink-0">{accs.length}</Badge>
+                    {host && h.replace(/^\./, "") === host.replace(/^\./, "") && (
+                      <Badge className="bg-primary/15 text-primary border-0 justify-self-end shrink-0">現在のサイト</Badge>
+                    )}
                   </div>
                 </AccordionTrigger>
                 <AccordionContent>
@@ -510,13 +488,18 @@ export default function AccountManager() {
 
                       return (
                         <div key={it.id} className="rounded-lg border p-3 space-y-2">
-                          {/* ヘッダ行 */}
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="font-medium truncate">{it.title || it.username}</span>
-                            <span className="text-xs text-muted-foreground shrink-0">
-                              （{new Date(it.updatedAt).toLocaleString()}）
+                          {/* ヘッダ：タイトル/ユーザ名（可変）＋日時（固定幅）＋操作（固定） */}
+                          <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 min-w-0">
+                            <span className="font-medium truncate" title={it.title || it.username}>
+                              {it.title || it.username}
                             </span>
-                            <div className="ml-auto flex items-center gap-1 shrink-0">
+                            <span
+                              className="text-xs text-muted-foreground shrink-0"
+                              title={new Date(it.updatedAt).toLocaleString()}
+                            >
+                              {new Date(it.updatedAt).toLocaleString()}
+                            </span>
+                            <div className="flex items-center gap-1 justify-self-end shrink-0">
                               <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setEditing(it)} title="編集">
                                 <Pencil className="h-4 w-4" />
                               </Button>
@@ -526,19 +509,20 @@ export default function AccountManager() {
                             </div>
                           </div>
 
-                          {/* ユーザ名 */}
-                          <div className="flex items-center gap-2">
+                          {/* ユーザ名（値は Input で自然横スクロール） */}
+                          <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 min-w-0">
                             <span className="shrink-0 text-muted-foreground w-16">ﾕｰｻﾞ名</span>
                             <Input
                               readOnly
                               value={it.username}
-                              className="h-8 font-mono flex-1 min-w-0"
+                              className="h-8 font-mono min-w-0"
+                              title={it.username}
                               onFocus={(e) => e.currentTarget.select()}
                             />
                             <Button
                               variant="outline"
                               size="icon"
-                              className="h-8 w-8 shrink-0"
+                              className="h-8 w-8 shrink-0 justify-self-end"
                               onClick={() => copyWithKey(userKey, it.username)}
                               title="ユーザ名をコピー"
                             >
@@ -546,14 +530,15 @@ export default function AccountManager() {
                             </Button>
                           </div>
 
-                          {/* パスワード */}
-                          <div className="flex items-center gap-2">
+                          {/* パスワード（長文対応：input は横スクロール。表示/非表示トグルは固定） */}
+                          <div className="grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-2 min-w-0">
                             <span className="shrink-0 text-muted-foreground w-16">ﾊﾟｽﾜｰﾄﾞ</span>
                             <Input
                               readOnly
                               type={revealed ? "text" : "password"}
                               value={it.password}
-                              className="h-8 font-mono flex-1 min-w-0"
+                              className="h-8 font-mono min-w-0"
+                              title={revealed ? it.password : ""}
                               onFocus={(e) => e.currentTarget.select()}
                             />
                             <Button
@@ -568,7 +553,7 @@ export default function AccountManager() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 shrink-0"
+                              className="h-8 w-8 shrink-0 justify-self-end"
                               onClick={() => setRevealedIds((s) => ({ ...s, [it.id]: !revealed }))}
                               title={revealed ? "隠す" : "表示"}
                             >
@@ -576,15 +561,15 @@ export default function AccountManager() {
                             </Button>
                           </div>
 
-                          {/* メモ */}
+                          {/* メモ（長文折返し） */}
                           {it.note && (
-                            <div className="flex items-start gap-2">
+                            <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-2 min-w-0">
                               <span className="shrink-0 text-muted-foreground w-16 pt-0.5">メモ</span>
-                              <span className="whitespace-pre-wrap break-words">{it.note}</span>
+                              <span className="whitespace-pre-wrap break-words" title={it.note}>{it.note}</span>
                             </div>
                           )}
 
-                          {/* 利用ボタン（自動入力） */}
+                          {/* 利用ボタン（右寄せしすぎないよう折返し可） */}
                           <div className="flex flex-wrap items-center gap-2 pt-1">
                             <Button
                               size="sm"
@@ -616,7 +601,7 @@ export default function AccountManager() {
           </Accordion>
         )}
 
-        {/* 編集ダイアログ：高さ安全化（内部スクロール） */}
+        {/* 編集ダイアログ */}
         <Dialog open={!!editing} onOpenChange={(v) => !v && setEditing(null)}>
           <DialogContent className="w-[360px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-24px)] overflow-y-auto">
             <DialogHeader>
@@ -646,7 +631,7 @@ export default function AccountManager() {
           </DialogContent>
         </Dialog>
 
-        {/* ===== ステータス・フローティング（絶対配置） ===== */}
+        {/* Status */}
         <StatusOverlay status={status} />
 
         {/* hidden file chooser */}
@@ -729,16 +714,16 @@ function AddOrEditForm({
           <Label htmlFor="password">パスワード</Label>
           <StrengthBadge pw={vals.password} />
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 min-w-0">
           <Input
             id="password"
             type="text"
             value={vals.password}
             onChange={(e) => setVals((v) => ({ ...v, password: e.target.value }))}
-            className="flex-1"
+            className="flex-1 min-w-0"
             required
           />
-          <Button type="button" variant="outline" onClick={quickGen}>
+          <Button type="button" variant="outline" onClick={quickGen} className="shrink-0">
             生成
           </Button>
         </div>
@@ -752,6 +737,7 @@ function AddOrEditForm({
           onChange={(e) => setVals((v) => ({ ...v, note: e.target.value }))}
           placeholder="2FA バックアップコード保管場所など"
           rows={3}
+          className="break-words"
         />
       </div>
 
@@ -763,9 +749,7 @@ function AddOrEditForm({
 }
 
 /* =========================================================
-   ステータス・フローティング（レイアウト非干渉）
-   - 位置: CardContent の下部中央
-   - 非モーダル・フォーカスを奪わない・自動消滅
+   Status Floating
 ========================================================= */
 function StatusOverlay({
   status,
@@ -774,12 +758,9 @@ function StatusOverlay({
 }) {
   if (!status) return null
   const toneStyles: Record<Tone, string> = {
-    success:
-      "border-emerald-500/30 text-emerald-900 dark:text-emerald-100 bg-emerald-500/10",
-    error:
-      "border-red-500/30 text-red-900 dark:text-red-100 bg-red-500/10",
-    info:
-      "border-muted-foreground/30 text-foreground bg-muted/70",
+    success: "border-emerald-500/30 text-emerald-900 dark:text-emerald-100 bg-emerald-500/10",
+    error: "border-red-500/30 text-red-900 dark:text-red-100 bg-red-500/10",
+    info: "border-muted-foreground/30 text-foreground bg-muted/70",
   }
   const dotStyles: Record<Tone, string> = {
     success: "bg-emerald-500",
@@ -787,14 +768,8 @@ function StatusOverlay({
     info: "bg-foreground/60",
   }
   return (
-    <div
-      className="pointer-events-none absolute left-1/2 bottom-2 z-50 -translate-x-1/2"
-      aria-live="polite"
-      role="status"
-    >
-      <div
-        className={`px-3 py-2 rounded-md border text-sm shadow-sm backdrop-blur supports-[backdrop-filter]:backdrop-blur ${toneStyles[status.tone]}`}
-      >
+    <div className="pointer-events-none absolute left-1/2 bottom-2 z-50 -translate-x-1/2" aria-live="polite" role="status">
+      <div className={`px-3 py-2 rounded-md border text-sm shadow-sm backdrop-blur ${toneStyles[status.tone]}`}>
         <div className="flex items-center gap-2">
           <span className={`h-2 w-2 rounded-full ${dotStyles[status.tone]}`} />
           <span className="whitespace-pre-wrap">{status.text}</span>
