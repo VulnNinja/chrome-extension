@@ -947,8 +947,6 @@ export default function BookmarkManager() {
                 try {
                   const u = new URL(vals.url.trim())
                   const hostKey = (vals.host || u.host).trim()
-                  const now = Date.now()
-                  const order = calcNextOrderInHost(hostKey)
                   await addBookmark({
                     url: u.toString(),
                     host: hostKey,
