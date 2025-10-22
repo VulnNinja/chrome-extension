@@ -92,12 +92,16 @@ export default function OriginMemo() {
   const [onlyUnchecked, setOnlyUnchecked] = useState(false)
   const [q, setQ] = useState("")
 
-  // 自動スクロール
+  // 自動スクロール（新規追加時のみ）
   const listEndRef = useRef<HTMLDivElement | null>(null)
+  const prevLenRef = useRef<number>(0)
 
   // 並び替え（DnD）
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
+
+  // 各アイテム要素参照（編集時に "nearest" へスクロール）
+  const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map())
 
   useEffect(() => {
     ; (async () => {
@@ -133,7 +137,6 @@ export default function OriginMemo() {
       .filter(i => (onlyUnchecked ? !i.checked : true))
       .filter(i => (q.trim() ? i.content.toLowerCase().includes(q.trim().toLowerCase()) : true))
       .slice()
-    // 並び順: ホストごと order 昇順 / 未定義は createdAt
     filtered.sort((a, b) => (a.order ?? a.createdAt) - (b.order ?? b.createdAt))
     return filtered
   }, [items, effectiveHost, onlyUnchecked, q])
@@ -143,9 +146,14 @@ export default function OriginMemo() {
     [items, effectiveHost]
   )
 
+  // 新規追加時のみ最下部へスクロール（編集/フィルタ変更ではスクロールしない）
   useEffect(() => {
-    listEndRef.current?.scrollIntoView({ block: "end" })
-  }, [scopeItems.length, editingId, onlyUnchecked, q, hostScope])
+    const len = scopeItems.length
+    if (len > prevLenRef.current) {
+      listEndRef.current?.scrollIntoView({ block: "end" })
+    }
+    prevLenRef.current = len
+  }, [scopeItems.length])
 
   async function persist(next: MemoItem[]) {
     setItems(next)
@@ -158,7 +166,7 @@ export default function OriginMemo() {
     if (!text) return
     const now = Date.now()
     const host = effectiveHost ?? currentHost ?? "(unknown)"
-    const url = effectiveHost ? currentUrl ?? "" : "" // Allビューでも現在URLを入れておく
+    const url = currentUrl ?? ""
     const maxOrder =
       items
         .filter(i => i.host === host)
@@ -171,7 +179,7 @@ export default function OriginMemo() {
       checked: false,
       createdAt: now,
       contentUpdatedAt: now,
-      order: maxOrder + 10, // 少し余白を持たせる
+      order: maxOrder + 10,
     }
     await persist([...items, mi])
     setInput("")
@@ -184,12 +192,15 @@ export default function OriginMemo() {
 
   async function toggleCheck(id: string, v: boolean | "indeterminate") {
     const checked = v === true
-    await persist(items.map(x => (x.id === id ? { ...x, checked } : x))) // 本文編集ではないので updated は変更しない
+    await persist(items.map(x => (x.id === id ? { ...x, checked } : x)))
   }
 
   function startEdit(m: MemoItem) {
     setEditingId(m.id)
     setEditingText(m.content)
+    // 編集対象を見失わないよう、近接スクロール（大きなジャンプを避ける）
+    const el = itemRefs.current.get(m.id)
+    el?.scrollIntoView({ block: "nearest" })
   }
   function cancelEdit() {
     setEditingId(null)
@@ -267,15 +278,25 @@ export default function OriginMemo() {
     if (!isReorderEnabled) return e.preventDefault()
     setDraggingId(id)
     e.dataTransfer.effectAllowed = "move"
-    e.dataTransfer.setData("text/plain", id)
+    // 透明なドラッグイメージでチラつき防止
+    const img = document.createElement("canvas")
+    img.width = img.height = 1
+    e.dataTransfer.setDragImage(img, 0, 0)
+  }
+  function computeDropIndex(e: React.DragEvent, overIdx: number, el: HTMLElement) {
+    const rect = el.getBoundingClientRect()
+    const ratio = (e.clientY - rect.top) / rect.height
+    const before = ratio < 0.5
+    return before ? overIdx : overIdx + 1
+  }
+  function onDragEnter(e: React.DragEvent, overIdx: number, el: HTMLElement) {
+    if (!isReorderEnabled || !draggingId) return
+    setDropIndex(computeDropIndex(e, overIdx, el))
   }
   function onDragOver(e: React.DragEvent, overIdx: number, el: HTMLElement) {
     if (!isReorderEnabled || !draggingId) return
     e.preventDefault()
-    const rect = el.getBoundingClientRect()
-    const offsetY = e.clientY - rect.top
-    const before = offsetY < rect.height / 2
-    setDropIndex(before ? overIdx : overIdx + 1)
+    setDropIndex(computeDropIndex(e, overIdx, el))
   }
   async function onDrop() {
     if (!isReorderEnabled || draggingId == null || dropIndex == null) {
@@ -285,7 +306,8 @@ export default function OriginMemo() {
     }
     const list = scopeItems.slice()
     const from = list.findIndex(m => m.id === draggingId)
-    const to = dropIndex > list.length ? list.length : dropIndex
+    const bounded = Math.max(0, Math.min(dropIndex, list.length))
+    const to = bounded
     if (from < 0 || from === to || from + 1 === to) {
       setDraggingId(null)
       setDropIndex(null)
@@ -293,10 +315,8 @@ export default function OriginMemo() {
     }
     const moved = list.splice(from, 1)[0]
     list.splice(to > from ? to - 1 : to, 0, moved)
-
-    // order を再割当（10刻み）
     const nextList = list.map((m, i) => ({ ...m, order: (i + 1) * 10 }))
-    const nextAll = items.map(m => (m.host === (effectiveHost ?? m.host) ? (nextList.find(x => x.id === m.id) ?? m) : m))
+    const nextAll = items.map(m => (effectiveHost && m.host === effectiveHost ? (nextList.find(x => x.id === m.id) ?? m) : m))
     await persist(nextAll)
     setDraggingId(null)
     setDropIndex(null)
@@ -372,7 +392,6 @@ export default function OriginMemo() {
                 </DropdownMenuContent>
               </DropdownMenu>
 
-
               <Badge variant="secondary" className="shrink-0">{uncheckedCount} 未処理</Badge>
 
               <div className="ml-auto flex items-center gap-1">
@@ -438,9 +457,9 @@ export default function OriginMemo() {
                   </DialogHeader>
                   <div className="text-sm space-y-2">
                     <p>・Enterで送信 / Shift+Enterで改行</p>
-                    <p>・Alt+クリックで編集モードに切替</p>
+                    <p>・Alt+クリックで編集モードに切替（対象はその場で編集、ページ外へ飛びません）</p>
                     <p>・(i)で詳細、…メニューから編集・削除</p>
-                    <p>・ドラッグ＆ドロップで並び替え（ホスト表示時のみ）</p>
+                    <p>・ドラッグ＆ドロップで並び替え（ホスト表示時のみ）。青いラインとスペーサで挿入位置を表示します。</p>
                     <p>・未チェックのみフィルタ、検索、Markdown/JSON出力に対応</p>
                   </div>
                 </DialogContent>
@@ -463,22 +482,28 @@ export default function OriginMemo() {
                 const showDropLine = dropIndex === idx
                 return (
                   <div key={m.id} className="w-full">
-                    {/* ドロップインジケータ（上側） */}
+                    {/* ドロップインジケータ（上側 / スペーサを設け見やすく） */}
                     {isReorderEnabled && showDropLine && (
-                      <div className="h-2 -mb-2 relative">
-                        <div className="absolute left-1 right-1 top-1 h-[3px] rounded bg-primary/60" />
+                      <div className="relative h-3 -mb-2">
+                        <div className="absolute inset-x-1 top-1 h-[3px] rounded bg-primary/70 shadow-[0_0_0_2px_rgba(0,0,0,0.04)]" />
                       </div>
                     )}
 
                     <div
-                      className={`relative w-full min-h-[108px] rounded-lg border p-3 bg-background shadow-sm transition-all duration-200
-                                 hover:bg-muted/40 ${isDragging ? "ring-2 ring-primary/60" : ""}`}
+                      ref={(el) => {
+                        if (el) itemRefs.current.set(m.id, el)
+                        else itemRefs.current.delete(m.id)
+                      }}
+                      className={`relative w-full min-h-[108px] rounded-lg border p-3 bg-background shadow-sm transition-[background,transform,box-shadow] duration-150
+                                 hover:bg-muted/40 ${isDragging ? "ring-2 ring-primary/60 scale-[0.997]" : ""} ${isReorderEnabled ? "cursor-grab active:cursor-grabbing" : ""}`}
                       draggable={isReorderEnabled}
                       onDragStart={(e) => onDragStart(e, m.id)}
+                      onDragEnter={(e) => onDragEnter(e, idx, e.currentTarget)}
                       onDragOver={(e) => onDragOver(e, idx, e.currentTarget)}
                       onDragEnd={() => { setDraggingId(null); setDropIndex(null) }}
                       onDrop={onDrop}
                       onMouseDown={(e) => onAltEdit(e, m)}
+                      aria-grabbed={isDragging}
                     >
                       {/* 左上: チェックボックス + グリップ */}
                       <div className="absolute left-2 top-2 flex items-center gap-2" data-ctrl>
@@ -577,7 +602,6 @@ export default function OriginMemo() {
                               }
                             }}
                             onBlur={() => {
-                              // テキストボックス外クリックで自動保存（キャンセル等は抑制）
                               setTimeout(() => {
                                 if (suppressAutoSaveRef.current) {
                                   suppressAutoSaveRef.current = false
@@ -607,8 +631,8 @@ export default function OriginMemo() {
 
                     {/* ドロップインジケータ（最後尾） */}
                     {isReorderEnabled && dropIndex === scopeItems.length && idx === scopeItems.length - 1 && (
-                      <div className="h-2 mt-1 relative">
-                        <div className="absolute left-1 right-1 top-0 h-[3px] rounded bg-primary/60" />
+                      <div className="relative h-3 mt-1">
+                        <div className="absolute inset-x-1 top-0 h-[3px] rounded bg-primary/70 shadow-[0_0_0_2px_rgba(0,0,0,0.04)]" />
                       </div>
                     )}
                   </div>

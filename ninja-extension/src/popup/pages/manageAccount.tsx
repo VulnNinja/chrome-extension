@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState, useDeferredValue } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -47,6 +47,7 @@ import {
   CheckCheck,
   LogIn,
   MousePointerClick,
+  Loader2,
 } from "lucide-react"
 
 /* =========================================================
@@ -151,14 +152,18 @@ export default function AccountManager() {
   const [items, setItems] = useState<Account[]>([])
   const [host, setHost] = useState<string | null>(null)
   const [search, setSearch] = useState("")
+  const searchQ = useDeferredValue(search) // 入力中の無駄な再計算を軽減
   const [addOpen, setAddOpen] = useState(false)
   const [editing, setEditing] = useState<Account | null>(null)
   const [revealedIds, setRevealedIds] = useState<Record<string, boolean>>({})
-  const [copiedKey, setCopiedKey] = useState<string | null>(null) // `${id}:user` or `${id}:pass`
+  const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const copyTimerRef = useRef<number | null>(null)
 
   const [status, setStatus] = useState<{ text: string; tone: Tone } | null>(null)
   const statusTimerRef = useRef<number | null>(null)
+
+  // フィル中インジケータ（ボタン連打防止 & UX向上）
+  const [fillingId, setFillingId] = useState<string | null>(null)
 
   useEffect(() => {
     ; (async () => {
@@ -172,12 +177,12 @@ export default function AccountManager() {
   }, [])
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
+    const q = searchQ.trim().toLowerCase()
     if (!q) return items
     return items.filter((it) =>
       [it.host, it.username, it.title ?? "", it.note ?? ""].some((v) => v.toLowerCase().includes(q))
     )
-  }, [items, search])
+  }, [items, searchQ])
 
   const byHost = useMemo(() => {
     const map = new Map<string, Account[]>()
@@ -241,6 +246,17 @@ export default function AccountManager() {
     }
   }
 
+  // ====== フィル & 送信（wait を設ける） ======
+  const handleFill = async (id: string, username: string, password: string, doSubmit: boolean) => {
+    setFillingId(id)
+    try {
+      await fillAccountOnPage(username, password, doSubmit)
+    } finally {
+      // 軽く待ってから解除（連打誤作動防止）
+      setTimeout(() => setFillingId(null), 200)
+    }
+  }
+
   const fillAccountOnPage = async (username: string, password: string, doSubmit: boolean) => {
     try {
       if (!chromeApi?.tabs?.query || !chromeApi?.scripting?.executeScript) {
@@ -253,10 +269,13 @@ export default function AccountManager() {
         return
       }
 
+      const waitMs = 250 // 入力反映→送信の間に待機
       const [{ result }] = await chromeApi.scripting.executeScript({
         target: { tabId: tab.id },
-        args: [username, password, doSubmit],
-        func: (u: string, p: string, submit: boolean) => {
+        args: [username, password, doSubmit, waitMs],
+        func: async (u: string, p: string, submit: boolean, wait: number) => {
+          const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
           const isVisible = (el: HTMLElement) => {
             const style = window.getComputedStyle(el)
             const rect = el.getBoundingClientRect()
@@ -291,6 +310,7 @@ export default function AccountManager() {
             desc?.set?.call(el, val)
             el.dispatchEvent(new Event("input", { bubbles: true }))
             el.dispatchEvent(new Event("change", { bubbles: true }))
+            el.dispatchEvent(new KeyboardEvent("keyup", { bubbles: true }))
           }
           if (userInput) {
             setVal(userInput, u)
@@ -302,10 +322,15 @@ export default function AccountManager() {
             filledPass = true
           }
 
+          // 入力反映待ち
+          await sleep(wait)
+
           let submitted = false
           if (submit) {
             const targetForm = passInput?.form || userInput?.form || document.querySelector("form")
             if (targetForm) {
+              // 追加の待ちを入れて UI/validator を待機
+              await sleep(wait)
               // @ts-ignore
               if (typeof targetForm.requestSubmit === "function") {
                 // @ts-ignore
@@ -320,7 +345,8 @@ export default function AccountManager() {
                 (document.querySelector('button[type="submit"]') as HTMLButtonElement | null) ||
                 (document.querySelector('input[type="submit"]') as HTMLInputElement | null)
               if (btn) {
-                ; (btn as HTMLElement).click()
+                await sleep(wait)
+                  ; (btn as HTMLElement).click()
                 submitted = true
               }
             }
@@ -387,7 +413,7 @@ export default function AccountManager() {
             {host && <Badge variant="secondary" className="justify-self-end shrink-0">このサイト</Badge>}
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            ホスト単位でアカウントを管理。値は入力欄で水平スクロールし、レイアウト崩れを防ぎます。
+            ホスト単位で管理。長い値は入力欄で水平スクロールできます。
           </p>
         </div>
 
@@ -432,7 +458,7 @@ export default function AccountManager() {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="shrink-0">
+                <Button variant="outline" size="sm" className="shrink-0" title="エクスポート/インポート">
                   <Download className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -485,31 +511,38 @@ export default function AccountManager() {
                       const passKey = `${it.id}:pass`
                       const userCopied = copiedKey === userKey
                       const passCopied = copiedKey === passKey
+                      const busy = fillingId === it.id
 
                       return (
-                        <div key={it.id} className="rounded-lg border p-3 space-y-2">
-                          {/* ヘッダ：タイトル/ユーザ名（可変）＋日時（固定幅）＋操作（固定） */}
-                          <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 min-w-0">
+                        <div key={it.id} className="rounded-lg border p-3 space-y-2 hover:bg-muted/30 transition-colors">
+                          {/* ヘッダ：タイトル/ユーザ名（可変）＋操作（固定） ※日時表示は削除 */}
+                          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 min-w-0">
                             <span className="font-medium truncate" title={it.title || it.username}>
                               {it.title || it.username}
                             </span>
-                            <span
-                              className="text-xs text-muted-foreground shrink-0"
-                              title={new Date(it.updatedAt).toLocaleString()}
-                            >
-                              {new Date(it.updatedAt).toLocaleString()}
-                            </span>
                             <div className="flex items-center gap-1 justify-self-end shrink-0">
-                              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setEditing(it)} title="編集">
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => setEditing(it)}
+                                title="編集"
+                              >
                                 <Pencil className="h-4 w-4" />
                               </Button>
-                              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => deleteAccount(it.id)} title="削除">
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => deleteAccount(it.id)}
+                                title="削除"
+                              >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
                           </div>
 
-                          {/* ユーザ名（値は Input で自然横スクロール） */}
+                          {/* ユーザ名 */}
                           <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 min-w-0">
                             <span className="shrink-0 text-muted-foreground w-16">ﾕｰｻﾞ名</span>
                             <Input
@@ -530,7 +563,7 @@ export default function AccountManager() {
                             </Button>
                           </div>
 
-                          {/* パスワード（長文対応：input は横スクロール。表示/非表示トグルは固定） */}
+                          {/* パスワード */}
                           <div className="grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-2 min-w-0">
                             <span className="shrink-0 text-muted-foreground w-16">ﾊﾟｽﾜｰﾄﾞ</span>
                             <Input
@@ -561,7 +594,7 @@ export default function AccountManager() {
                             </Button>
                           </div>
 
-                          {/* メモ（長文折返し） */}
+                          {/* メモ */}
                           {it.note && (
                             <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-2 min-w-0">
                               <span className="shrink-0 text-muted-foreground w-16 pt-0.5">メモ</span>
@@ -569,25 +602,27 @@ export default function AccountManager() {
                             </div>
                           )}
 
-                          {/* 利用ボタン（右寄せしすぎないよう折返し可） */}
+                          {/* 利用ボタン（待機・連打防止） */}
                           <div className="flex flex-wrap items-center gap-2 pt-1">
                             <Button
                               size="sm"
-                              onClick={() => fillAccountOnPage(it.username, it.password, false)}
+                              disabled={busy}
+                              onClick={() => handleFill(it.id, it.username, it.password, false)}
                               title="アクティブなページの入力欄へ自動入力"
                               className="h-8"
                             >
-                              <MousePointerClick className="h-4 w-4 mr-1" />
+                              {busy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <MousePointerClick className="h-4 w-4 mr-1" />}
                               入力
                             </Button>
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => fillAccountOnPage(it.username, it.password, true)}
-                              title="自動入力して送信"
+                              disabled={busy}
+                              onClick={() => handleFill(it.id, it.username, it.password, true)}
+                              title="自動入力して送信（値反映後に短い待機を挟みます）"
                               className="h-8"
                             >
-                              <LogIn className="h-4 w-4 mr-1" />
+                              {busy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <LogIn className="h-4 w-4 mr-1" />}
                               入力+送信
                             </Button>
                           </div>
