@@ -5,6 +5,7 @@ import {
   NotebookPen,
   RectangleEllipsis,
   SquareMousePointer,
+  UserRoundPen
 } from "lucide-react"
 import {
   Tabs,
@@ -19,6 +20,7 @@ import CheckIframeEnbed from "./pages/checkIframeEnbed"
 import AccountManager from "./pages/manageAccount"
 import BookmarkManager from "./pages/bookmark"
 import OriginMemo from "./pages/memo"
+import PersonalDataAssistant from "./pages/PersonalDataAssistant"
 
 const tabItems = [
   {
@@ -42,6 +44,11 @@ const tabItems = [
     content: <AccountManager />,
   },
   {
+    value: "personal-data-assistant",
+    icon: <UserRoundPen />,
+    content: <PersonalDataAssistant />
+  },
+  {
     value: "bookmark",
     icon: <Bookmark />,
     content: <BookmarkManager />,
@@ -50,7 +57,7 @@ const tabItems = [
     value: "memo",
     icon: <NotebookPen />,
     content: <OriginMemo />
-  }
+  },
 ]
 
 const Top = () => {
