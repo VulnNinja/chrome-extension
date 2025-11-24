@@ -89,6 +89,13 @@ function decodeValue(value: string) {
 }
 
 /* ======================== 本体 ======================== */
+type ConfirmCfg = {
+  title: string
+  description?: string
+  confirmText?: string
+  onConfirm: () => Promise<void> | void
+}
+
 export default function ControlCookie() {
   const [activeUrl, setActiveUrl] = useState<string | null>(null)
   const [host, setHost] = useState<string | null>(null)
@@ -111,6 +118,12 @@ export default function ControlCookie() {
   // import/export
   const fileRef = useRef<HTMLInputElement | null>(null)
 
+  // 選択（複数操作）
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set())
+
+  // confirm ダイアログ
+  const [confirmCfg, setConfirmCfg] = useState<ConfirmCfg | null>(null)
+
   useEffect(() => {
     load()
     return () => {
@@ -123,7 +136,7 @@ export default function ControlCookie() {
   const showStatus = (text: string, tone: Tone = "info") => {
     setStatus({ text, tone })
     if (statusTimerRef.current) window.clearTimeout(statusTimerRef.current)
-    statusTimerRef.current = window.setTimeout(() => setStatus(null), 1400)
+    statusTimerRef.current = window.setTimeout(() => setStatus(null), 1600)
   }
 
   async function load() {
@@ -147,6 +160,7 @@ export default function ControlCookie() {
         }))
         setCookies(arr)
         setEditingKey(null)
+        setSelectedKeys(new Set())
         showStatus(`取得 ${arr.length}件`, "success")
       })
     } catch { showStatus("取得に失敗", "error") }
@@ -215,9 +229,15 @@ export default function ControlCookie() {
       const httpsPrefer = c.secure || (activeUrl?.startsWith("https://") ?? true)
       const url = `${httpsPrefer ? "https" : "http"}://${baseHost}${c.path || "/"}`
       await chromeApi.cookies.remove({ url, name: c.name })
-      showStatus("削除しました", "info")
       setCookies(prev => prev.filter(x => !(x.name === c.name && x.domain === c.domain && x.path === c.path)))
-    } catch { showStatus("削除失敗", "error") }
+    } catch { /* noop */ }
+  }
+
+  const removeCookies = async (list: CookieItem[]) => {
+    await Promise.all(list.map(removeCookie))
+    showStatus(`削除 ${list.length}件`, "info")
+    setSelectedKeys(new Set())
+    load()
   }
 
   const onImport = async (file: File) => {
@@ -238,6 +258,9 @@ export default function ControlCookie() {
     URL.revokeObjectURL(url)
   }
 
+  const selectedCount = selectedKeys.size
+  const selectedItems = cookies.filter(c => selectedKeys.has(keyOf(c)))
+
   /* ======================== 画面 ======================== */
   return (
     <Card className="w-full">
@@ -245,11 +268,10 @@ export default function ControlCookie() {
         <CardTitle className="text-lg">Cookie操作ツール</CardTitle>
       </CardHeader>
 
-      {/* 親が w-[400px] h-[500px]。横崩れ防止のため overflow-x-hidden / min-w-0 */}
+      {/* 親が w-[400px]。横崩れ防止のため overflow-x-hidden / min-w-0 */}
       <CardContent className="relative grid gap-4 overflow-x-hidden pb-12">
         {/* 情報バー */}
         <div className="rounded-xl border p-3 bg-muted/30">
-          {/* ← Host が長くても崩れないように「ラベル固定＋値だけ truncate」 */}
           <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 text-sm min-w-0">
             <div className="flex items-center gap-2 shrink-0">
               <CookieIcon className="h-4 w-4" />
@@ -259,7 +281,7 @@ export default function ControlCookie() {
             <Badge variant="secondary" className="justify-self-end">{scope === "url" ? "URL" : "Domain"}</Badge>
           </div>
 
-          <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto_auto_auto_auto] gap-2 items-center">
+          <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-2 items-center">
             <div className="relative min-w-0">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 opacity-60" />
               <Input
@@ -280,22 +302,36 @@ export default function ControlCookie() {
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuItem onClick={() => setScope("url")}>現在URL</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setScope("domain")}>ドメイン全体</DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={exportJson}>
                   <Download className="h-4 w-4 mr-2" />
-                  JSON書き出し
+                  JSON書き出し（表示中）
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => fileRef.current?.click()}>
                   <Upload className="h-4 w-4 mr-2" />
                   JSON読み込み
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive"
+                  onClick={() =>
+                    setConfirmCfg({
+                      title: "表示中のCookieを全削除しますか？",
+                      description: `対象: ${cookies.length} 件`,
+                      confirmText: "削除",
+                      onConfirm: async () => { await removeCookies(cookies) }
+                    })
+                  }
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  全削除（表示中）
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* 追加（アイコンのみ） */}
             <Dialog open={addingOpen} onOpenChange={setAddingOpen}>
               <DialogTrigger asChild>
                 <Button size="icon" title="追加" className="h-9 w-9">
@@ -327,6 +363,37 @@ export default function ControlCookie() {
               }}
             />
           </div>
+
+          {/* 選択操作バー（選択時のみ表示） */}
+          {selectedCount > 0 && (
+            <div className="mt-2 flex items-center justify-between rounded-md border bg-background px-2 py-1.5">
+              <span className="text-xs text-muted-foreground">選択中: {selectedCount} 件</span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedKeys(new Set())}
+                >
+                  選択解除
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() =>
+                    setConfirmCfg({
+                      title: "選択したCookieを削除しますか？",
+                      description: `対象: ${selectedCount} 件`,
+                      confirmText: "削除",
+                      onConfirm: async () => { await removeCookies(selectedItems) }
+                    })
+                  }
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  選択削除
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
         <Separator />
@@ -341,8 +408,7 @@ export default function ControlCookie() {
               return (
                 <AccordionItem key={domain} value={domain}>
                   <AccordionTrigger className="text-left">
-                    {/* ドメイン見出し：左可変・右固定の 3 カラムで崩れ防止 */}
-                    <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 w-full">
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-2 w-full">
                       <span className="font-medium truncate" title={domain}>{domain}</span>
                       <Badge variant="secondary" className="justify-self-end">{list.length}</Badge>
                       {isCurrent && (
@@ -350,6 +416,23 @@ export default function ControlCookie() {
                           現在ホスト
                         </Badge>
                       )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="justify-self-end"
+                        onClick={() =>
+                          setConfirmCfg({
+                            title: `${domain} のCookieを全削除しますか？`,
+                            description: `対象: ${list.length} 件`,
+                            confirmText: "削除",
+                            onConfirm: async () => { await removeCookies(list) }
+                          })
+                        }
+                        title="このドメインのCookieを全削除"
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        全削除
+                      </Button>
                     </div>
                   </AccordionTrigger>
                   <AccordionContent>
@@ -359,11 +442,26 @@ export default function ControlCookie() {
                         const copied = copiedKey === rowKey
                         const risky = (!c.secure && (activeUrl?.startsWith("https://") ?? true)) || !c.httpOnly
                         const isEditing = editingKey === rowKey
+                        const checked = selectedKeys.has(rowKey)
 
                         return (
                           <div key={rowKey} className="rounded-lg border p-3 space-y-2">
-                            {/* 1段目：名前＋バッジ＋詳細ボタン（右端固定） */}
-                            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+                            {/* 1段目：選択チェック＋名前＋バッジ＋詳細 */}
+                            <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-2">
+                              <input
+                                type="checkbox"
+                                className="mt-1.5"
+                                checked={checked}
+                                onChange={(e) => {
+                                  setSelectedKeys(prev => {
+                                    const next = new Set(prev)
+                                    if (e.target.checked) next.add(rowKey)
+                                    else next.delete(rowKey)
+                                    return next
+                                  })
+                                }}
+                                aria-label="選択"
+                              />
                               <span className="font-medium truncate" title={c.name}>{c.name}</span>
                               <div className="flex items-center gap-1 justify-self-end">
                                 {risky ? (
@@ -412,7 +510,7 @@ export default function ControlCookie() {
                                 {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                               </Button>
 
-                              {/* 右端：編集モード時は保存/キャンセル、通常はプルダウン */}
+                              {/* 右端：編集/削除 */}
                               {isEditing ? (
                                 <div className="flex items-center gap-2 justify-self-end">
                                   <Button
@@ -445,7 +543,14 @@ export default function ControlCookie() {
                                       編集
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
-                                      onClick={() => removeCookie(c)}
+                                      onClick={() =>
+                                        setConfirmCfg({
+                                          title: `「${c.name}」を削除しますか？`,
+                                          description: `${c.domain}${c.path}`,
+                                          confirmText: "削除",
+                                          onConfirm: async () => { await removeCookies([c]) }
+                                        })
+                                      }
                                     >
                                       <Trash2 className="h-4 w-4 mr-2" />
                                       削除
@@ -474,7 +579,6 @@ export default function ControlCookie() {
                 <KV label="Name" value={detailCookie.name} mono />
                 <div className="grid gap-1">
                   <Label>Value</Label>
-                  {/* 長文は Textarea で横スクロール排除 */}
                   <Textarea
                     readOnly
                     value={detailCookie.value}
@@ -506,8 +610,14 @@ export default function ControlCookie() {
           </DialogContent>
         </Dialog>
 
-        {/* ステータス（オーバーレイ表示でレイアウト非干渉） */}
-        <StatusOverlay status={status} />
+        {/* Confirm ダイアログ（confirm() 非使用） */}
+        <ConfirmDialog
+          cfg={confirmCfg}
+          clear={() => setConfirmCfg(null)}
+        />
+
+        {/* トースト */}
+        <StatusToast status={status} />
       </CardContent>
     </Card>
   )
@@ -528,7 +638,6 @@ function Decoder({ value }: { value: string }) {
   return (
     <div className="grid gap-2">
       <Label>{res.label}</Label>
-      {/* JWT/長文でも崩れないように固定高＋改行 */}
       <Textarea readOnly className="h-32 font-mono whitespace-pre-wrap break-words" value={res.text} />
       <div className="text-xs text-muted-foreground">
         URL/Base64URL/JWT を自動推測して表示します（推測結果の正確性は保証しません）。
@@ -537,7 +646,8 @@ function Decoder({ value }: { value: string }) {
   )
 }
 
-function StatusOverlay({ status }: { status: { text: string; tone: Tone } | null }) {
+/* 改良トースト：幅いっぱい・中央寄せ・最前面 */
+function StatusToast({ status }: { status: { text: string; tone: Tone } | null }) {
   if (!status) return null
   const toneStyles: Record<Tone, string> = {
     success: "border-emerald-500/30 text-emerald-900 dark:text-emerald-100 bg-emerald-500/10",
@@ -550,11 +660,15 @@ function StatusOverlay({ status }: { status: { text: string; tone: Tone } | null
     info: "bg-foreground/60",
   }
   return (
-    <div className="pointer-events-none absolute left-1/2 bottom-2 z-50 -translate-x-1/2" aria-live="polite" role="status">
-      <div className={`px-3 py-2 rounded-md border text-sm shadow-sm backdrop-blur ${toneStyles[status.tone]}`}>
-        <div className="flex items-center gap-2">
+    <div
+      className="fixed left-0 right-0 bottom-2 z-[9999] pointer-events-none flex justify-center"
+      aria-live="polite"
+      role="status"
+    >
+      <div className={`w-full max-w-[400px] mx-2 px-3 py-2 rounded-md border text-sm shadow-sm backdrop-blur ${toneStyles[status.tone]}`}>
+        <div className="flex items-center gap-2 justify-center">
           <span className={`h-2 w-2 rounded-full ${dotStyles[status.tone]}`} />
-          <span className="whitespace-pre-wrap">{status.text}</span>
+          <span className="whitespace-pre-wrap text-center">{status.text}</span>
         </div>
       </div>
     </div>
@@ -654,5 +768,30 @@ function CookieForm({
         <Button type="submit">保存</Button>
       </DialogFooter>
     </form>
+  )
+}
+
+/* ======= Confirm Dialog Component (replaces window.confirm) ======= */
+function ConfirmDialog({ cfg, clear }: { cfg: ConfirmCfg | null, clear: () => void }) {
+  return (
+    <Dialog open={!!cfg} onOpenChange={(v) => { if (!v) clear() }}>
+      <DialogContent className="w-[360px]">
+        <DialogHeader>
+          <DialogTitle>{cfg?.title}</DialogTitle>
+        </DialogHeader>
+        {cfg?.description && (
+          <p className="text-sm text-muted-foreground whitespace-pre-wrap">{cfg.description}</p>
+        )}
+        <DialogFooter>
+          <Button variant="outline" onClick={clear}>キャンセル</Button>
+          <Button
+            variant="destructive"
+            onClick={async () => { if (cfg) { await cfg.onConfirm(); clear() } }}
+          >
+            {cfg?.confirmText ?? "OK"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

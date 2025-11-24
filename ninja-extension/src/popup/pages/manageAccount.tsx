@@ -49,10 +49,7 @@ import {
   MousePointerClick,
   Loader2,
 } from "lucide-react"
-
-/* =========================================================
-   Types & storage（日時関連の要素は撤去）
-========================================================= */
+import { createPortal } from "react-dom"
 
 type Account = {
   id: string
@@ -919,37 +916,42 @@ function AddOrEditForm({
 /* =========================================================
    Status Floating（ボタンを文の下に配置）
 ========================================================= */
+// 差し替え：下部固定・「コピーしました」と同じスタイルで表示
 function StatusOverlay({
   status,
   onClose,
 }: {
   status: {
     text: string
-    tone: Tone
+    tone: "success" | "error" | "info"
     actionLabel?: string
     onAction?: () => void
   } | null
   onClose?: () => void
 }) {
   if (!status) return null
-  const toneStyles: Record<Tone, string> = {
+
+  const toneStyles: Record<"success" | "error" | "info", string> = {
     success: "border-emerald-500/30 text-emerald-900 dark:text-emerald-100 bg-emerald-500/10",
     error: "border-red-500/30 text-red-900 dark:text-red-100 bg-red-500/10",
     info: "border-muted-foreground/30 text-foreground bg-muted/70",
   }
-  const dotStyles: Record<Tone, string> = {
+  const dotStyles: Record<"success" | "error" | "info", string> = {
     success: "bg-emerald-500",
     error: "bg-red-500",
     info: "bg-foreground/60",
   }
-  return (
-    <div className="absolute left-1/2 bottom-2 z-50 -translate-x-1/2" aria-live="polite" role="status">
-      <div className={`px-3 py-2 rounded-md border text-sm shadow-sm backdrop-blur ${toneStyles[status.tone]}`}>
-        <div className="flex flex-col gap-2 items-stretch text-center">
-          <div className="flex items-center gap-2 justify-center">
+
+  return createPortal(
+    <div className="fixed left-1/2 bottom-2 z-[9999] -translate-x-1/2 pointer-events-none" role="status" aria-live="polite">
+      <div className={`pointer-events-auto px-3 py-2 rounded-md border text-sm shadow-sm backdrop-blur ${toneStyles[status.tone]}`}>
+        <div className="flex flex-col items-stretch gap-2 text-center max-w-[92vw] w-[360px]">
+          <div className="flex items-center justify-center gap-2">
             <span className={`h-2 w-2 rounded-full ${dotStyles[status.tone]}`} />
             <span className="whitespace-pre-wrap">{status.text}</span>
           </div>
+
+          {/* 「元に戻す」等のアクションを付けたい場合のみ下に表示 */}
           {status.actionLabel && status.onAction && (
             <Button
               size="sm"
@@ -958,13 +960,14 @@ function StatusOverlay({
                 status.onAction?.()
                 onClose?.()
               }}
+              className="mx-auto"
             >
               {status.actionLabel}
             </Button>
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
-

@@ -4,8 +4,9 @@ import {
   KeyRound,
   NotebookPen,
   RectangleEllipsis,
-  SquareMousePointer,
-  UserRoundPen
+  UserRoundPen,
+  Code2,
+  SearchCheck
 } from "lucide-react"
 import {
   Tabs,
@@ -16,11 +17,12 @@ import {
 import GeneratePassword from "./pages/generatePassword"
 import { ModeToggle } from "@/components/mode-toggle"
 import ControlCookie from "./pages/controlCookie"
-import CheckIframeEnbed from "./pages/checkIframeEnbed"
+import SecurityHeadersLab from "./pages/checkIframeEnbed"
 import AccountManager from "./pages/manageAccount"
 import BookmarkManager from "./pages/bookmark"
 import OriginMemo from "./pages/memo"
 import PersonalDataAssistant from "./pages/PersonalDataAssistant"
+import EncodeDecodeAssistant from "./pages/encoderDecoderPanel"
 
 const tabItems = [
   {
@@ -34,9 +36,9 @@ const tabItems = [
     content: <ControlCookie />,
   },
   {
-    value: "check-iframe-enbed",
-    icon: <SquareMousePointer />,
-    content: <CheckIframeEnbed />,
+    value: "security-header-lab",
+    icon: <SearchCheck />,
+    content: <SecurityHeadersLab />,
   },
   {
     value: "password-manager",
@@ -58,6 +60,11 @@ const tabItems = [
     icon: <NotebookPen />,
     content: <OriginMemo />
   },
+  {
+    value: "decoder",
+    icon: <Code2 />,
+    content: <EncodeDecodeAssistant />
+  }
 ]
 
 const Top = () => {
